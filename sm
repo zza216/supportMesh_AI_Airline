@@ -1,0 +1,117 @@
+#!/bin/bash
+
+# SupportMesh Docker Quick Commands
+
+case "$1" in
+  start)
+    echo "Starting all services..."
+    docker-compose up -d
+    echo "✓ Services started"
+    echo "  Dashboard: http://localhost:3000"
+    echo "  Backend:   http://localhost:3001"
+    ;;
+    
+  stop)
+    echo "Stopping all services..."
+    docker-compose down
+    echo "✓ Services stopped"
+    ;;
+    
+  restart)
+    echo "Restarting all services..."
+    docker-compose restart
+    echo "✓ Services restarted"
+    ;;
+    
+  logs)
+    if [ -z "$2" ]; then
+      echo "Showing all logs (Ctrl+C to exit)..."
+      docker-compose logs -f
+    else
+      echo "Showing $2 logs (Ctrl+C to exit)..."
+      docker-compose logs -f "$2"
+    fi
+    ;;
+    
+  status)
+    echo "Container Status:"
+    docker-compose ps
+    echo ""
+    echo "Service Health:"
+    echo -n "  Backend:    "
+    curl -s http://localhost:3001/health > /dev/null 2>&1 && echo "✓ OK" || echo "✗ Down"
+    echo -n "  Frontend:   "
+    curl -s http://localhost:3000 > /dev/null 2>&1 && echo "✓ OK" || echo "✗ Down"
+    echo -n "  LocalStack: "
+    curl -s http://localhost:4566/_localstack/health > /dev/null 2>&1 && echo "✓ OK" || echo "✗ Down"
+    ;;
+    
+  rebuild)
+    echo "Rebuilding all services..."
+    docker-compose up -d --build
+    echo "✓ Rebuild complete"
+    ;;
+    
+  clean)
+    echo "Cleaning everything..."
+    docker-compose down -v
+    rm -rf data/*
+    rm -rf lambda-functions/packages/*
+    echo "✓ Cleaned"
+    echo "Run './sm deploy' to start fresh"
+    ;;
+    
+  deploy)
+    echo "Full deployment..."
+    ./docker-deploy.sh
+    ;;
+    
+  lambda)
+    echo "Redeploying Lambda functions..."
+    bash deploy-lambdas.sh
+    echo "✓ Lambdas redeployed"
+    ;;
+    
+  shell)
+    if [ -z "$2" ]; then
+      echo "Usage: ./sm shell [backend|frontend|localstack]"
+    else
+      docker-compose exec "$2" sh 2>/dev/null || docker-compose exec "$2" bash
+    fi
+    ;;
+    
+  test)
+    echo "Submitting test message..."
+    curl -X POST http://localhost:3001/api/submit \
+      -H "Content-Type: application/json" \
+      -d '{"message":"Test message from CLI","email":"test@test.com"}' \
+      -s | jq
+    echo ""
+    echo "Check dashboard: http://localhost:3000"
+    ;;
+    
+  *)
+    echo "SupportMesh Quick Commands"
+    echo ""
+    echo "Usage: ./sm <command>"
+    echo ""
+    echo "Commands:"
+    echo "  deploy    - Full deployment (build + init + deploy Lambdas)"
+    echo "  start     - Start all services"
+    echo "  stop      - Stop all services"
+    echo "  restart   - Restart all services"
+    echo "  status    - Check service status"
+    echo "  logs      - View logs (all or specific: ./sm logs backend)"
+    echo "  rebuild   - Rebuild and restart services"
+    echo "  lambda    - Redeploy Lambda functions"
+    echo "  clean     - Clean all data and containers"
+    echo "  shell     - Access container shell (./sm shell backend)"
+    echo "  test      - Submit test message"
+    echo ""
+    echo "Examples:"
+    echo "  ./sm deploy        # First time setup"
+    echo "  ./sm start         # Start services"
+    echo "  ./sm logs backend  # View backend logs"
+    echo "  ./sm test          # Submit test message"
+    ;;
+esac
